@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>GD Dash Budget Edition</title>
+    <style>
+      :root {
+        --accent: #0ff;
+      }
+      body {
+        margin: 0;
+        background: #000;
+        color: white;
+        font-family: "Segoe UI", sans-serif;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      #gameContainer {
+        position: relative;
+        border: 4px solid #333;
+        overflow: hidden;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+        background: #05050a;
+      }
+      canvas {
+        display: block;
+        cursor: pointer;
+      }
+      #ui-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10;
+      }
+      .menu-card {
+        background: #111;
+        padding: 30px;
+        border-radius: 20px;
+        border: 2px solid var(--accent);
+        text-align: center;
+        min-width: 500px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+      }
+      .hidden {
+        display: none !important;
+      }
+      .level-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 15px;
+        padding: 10px;
+        margin: 20px 0;
+      }
+      .level-item {
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .level-item:hover {
+        transform: scale(1.05);
+        border-color: var(--accent);
+        background: #333;
+      }
+      .level-item.easy {
+        border-left: 4px solid #0f0;
+      }
+      .level-item.normal {
+        border-left: 4px solid #0af;
+      }
+      .level-item.hard {
+        border-left: 4px solid #f80;
+      }
+      .level-item.insane {
+        border-left: 4px solid #f0f;
+      }
+      .level-item.hacker {
+        border-left: 4px solid #f00;
+      }
+      .skin-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 20px 0;
+      }
+      .skin-option {
+        background: #222;
+        border: 2px solid #444;
+        padding: 5px;
+        cursor: pointer;
+        border-radius: 5px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .skin-option.selected {
+        border-color: var(--accent);
+        background: #333;
+      }
+      .color-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .color-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid transparent;
+      }
+      .btn {
+        background: transparent;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 10px 20px;
+        cursor: pointer;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin: 5px;
+        transition: 0.2s;
+      }
+      .btn:hover {
+        background: var(--accent);
+        color: #000;
+      }
+      .stats {
+        position: absolute;
+        top: 15px;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 30px;
+        box-sizing: border-box;
+        color: var(--accent);
+        font-weight: bold;
+        z-index: 5;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="gameContainer">
+      <button
+        id="pauseBtn"
+        class="btn hidden"
+        style="position: absolute; top: 10px; right: 10px; z-index: 20"
+        onclick="togglePause()"
+      >
+        PAUSE
+      </button>
+      <canvas id="gameCanvas" width="900" height="500"></canvas>
+      <div id="ui-overlay">
+        <div class="menu-card" id="homeMenu">
+          <h1 style="color: var(--accent); font-size: 2.5em; margin: 0">
+            GD DASH
+          </h1>
+          <p>BUDGET EDITION</p>
+          <button class="btn" onclick="switchMenu('levelSelect')">PLAY</button>
+          <button class="btn" onclick="switchMenu('avatarMenu')">ICONS</button>
+        </div>
+        <div class="menu-card hidden" id="avatarMenu">
+          <h2>SELECT ICON</h2>
+          <div class="color-grid" id="colorGrid"></div>
+          <div class="skin-grid" id="skinGrid"></div>
+          <h2>WAVE SHAPE</h2>
+          <div class="skin-grid" id="waveGrid"></div>
+          <button class="btn" onclick="switchMenu('homeMenu')">SAVE</button>
+        </div>
+        <div class="level-grid menu-card hidden" id="levelSelect">
+          <h2>CAMPAIGN</h2>
+          <div class="level-grid" id="levelContainer"></div>
+          <button class="btn" onclick="switchMenu('homeMenu')">BACK</button>
+        </div>
+        <div class="menu-card hidden" id="deathScreen">
+          <h2 style="color: #f33">CRASHED</h2>
+          <p id="deathStats"></p>
+          <button class="btn" onclick="resetGame()">RETRY</button>
+          <button class="btn" onclick="switchMenu('homeMenu')">MENU</button>
+        </div>
+      </div>
+      <div class="stats hidden" id="gameStats">
+        <div id="lvlNameDisplay">LEVEL</div>
+        <div id="progressLabel">0%</div>
+        <div id="attemptLabel">ATT: 1</div>
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      let seed = 1;
+      function seededRandom() {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      }
+      const Icons = {
+        Creeper: (g, s) => {
+          g.fillRect(-s / 2, -s / 2, s, s);
+          g.fillStyle = "black";
+          g.fillRect(-s / 4, -s / 4, s / 5, s / 5);
+          g.fillRect(s / 20, -s / 4, s / 5, s / 5);
+          g.fillRect(-s / 10, 0, s / 5, s / 4);
+        },
+        Robot: (g, s) => {
+          g.fillRect(-s / 2, -s / 2, s, s);
+          g.strokeStyle = "black";
+          g.strokeRect(-s / 3, -s / 3, s / 1.5, s / 1.5);
+          g.fillStyle = "black";
+          g.fillRect(-s / 4, -s / 6, s / 2, s / 10);
+        },
+        ShyGuy: (g, s) => {
+          g.beginPath();
+          g.arc(0, 0, s / 2, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "black";
+          g.beginPath();
+          g.ellipse(-s / 5, -s / 10, s / 10, s / 4, 0, 0, Math.PI * 2);
+          g.fill();
+          g.beginPath();
+          g.ellipse(s / 5, -s / 10, s / 10, s / 4, 0, 0, Math.PI * 2);
+          g.fill();
+        },
+        Knight: (g, s) => {
+          g.fillRect(-s / 2, -s / 2, s, s);
+          g.fillStyle = "black";
+          g.fillRect(-s / 2, -s / 10, s, s / 5);
+          g.fillRect(-s / 10, -s / 2, s / 5, s);
+        },
+        Smile: (g, s) => {
+          g.beginPath();
+          g.arc(0, 0, s / 2, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "black";
+          g.fillRect(-s / 4, -s / 4, s / 10, s / 10);
+          g.fillRect(s / 8, -s / 4, s / 10, s / 10);
+          g.beginPath();
+          g.arc(0, s / 10, s / 4, 0, Math.PI);
+          g.stroke();
+        },
+        Face: (g, s) => {
+          g.fillRect(-s / 2, -s / 2, s, s);
+          g.fillStyle = "black";
+          g.fillRect(-s / 3, -s / 3, s / 6, s / 6);
+          g.fillRect(s / 6, -s / 3, s / 6, s / 6);
+          g.fillRect(-s / 4, s / 6, s / 2, s / 12);
+        },
+        Gamer: (g, s) => {
+          g.fillRect(-s / 2, -s / 2, s, s);
+          g.fillStyle = "rgba(0,0,0,0.4)";
+          g.fillRect(-s / 2, -s / 5, s, s / 2.5);
+          g.fillStyle = "white";
+          g.beginPath();
+          g.arc(-s / 4, 0, s / 10, 0, Math.PI * 2);
+          g.fill();
+          g.beginPath();
+          g.arc(s / 4, 0, s / 10, 0, Math.PI * 2);
+          g.fill();
+        },
+        Kirby: (g, s) => {
+          g.beginPath();
+          g.arc(0, 0, s / 2, 0, Math.PI * 2);
+          g.fill();
+          g.fillStyle = "black";
+          g.fillRect(-s / 10, -s / 4, 2, s / 4);
+          g.fillRect(s / 10, -s / 4, 2, s / 4);
+        },
+      };
+      const WaveSkins = {
+        Triangle: (g, s) => {
+          g.beginPath();
+          g.moveTo(s / 2, 0);
+          g.lineTo(-s / 2, -s / 2);
+          g.lineTo(-s / 2, s / 2);
+          g.closePath();
+          g.fill();
+          g.stroke();
+        },
+        Needle: (g, s) => {
+          g.beginPath();
+          g.moveTo(s / 2, 0);
+          g.lineTo(-s / 2, -s / 4);
+          g.lineTo(-s / 2, s / 4);
+          g.closePath();
+          g.fill();
+          g.stroke();
+        },
+        Shard: (g, s) => {
+          g.beginPath();
+          g.moveTo(s / 2, 0);
+          g.lineTo(0, -s / 2);
+          g.lineTo(-s / 2, 0);
+          g.lineTo(0, s / 2);
+          g.closePath();
+          g.fill();
+          g.stroke();
+        },
+      };
+      const skinKeys = Object.keys(Icons);
+      const waveKeys = Object.keys(WaveSkins);
+      let selectedSkin = skinKeys[0],
+        selectedWave = waveKeys[0],
+        playerColor = "#00ffff";
+      const colors = [
+        "#00ffff",
+        "#ff0055",
+        "#00ff44",
+        "#ffaa00",
+        "#aa00ff",
+        "#ffffff",
+        "#ffff00",
+        "#5555ff",
+      ];
+      const difficulties = [
+        { type: "easy", speed: 7, gap: 220, color: [0, 255, 100], len: 25 },
+        { type: "normal", speed: 8, gap: 170, color: [0, 150, 255], len: 35 },
+        { type: "hard", speed: 9, gap: 130, color: [255, 150, 0], len: 45 },
+        { type: "insane", speed: 10, gap: 100, color: [200, 0, 255], len: 60 },
+        { type: "hacker", speed: 11.5, gap: 75, color: [255, 0, 50], len: 80 },
+      ];
+      const levelData = [];
+      difficulties.forEach((diff) => {
+        for (let i = 1; i <= 10; i++) {
+          levelData.push({
+            name: `${diff.type.toUpperCase()} ${i}`,
+            config: diff,
+          });
+        }
+      });
+      let state = "MENU",
+        currentLvlIdx = 0,
+        attempts = 1,
+        distance = 0,
+        speed = 7,
+        gravityDir = 1,
+        isPressing = false,
+        wasPressing = false;
+      let player = {
+        x: 150,
+        y: 420,
+        w: 30,
+        h: 30,
+        vy: 0,
+        rot: 0,
+        mode: "cube",
+        trail: [],
+      };
+      let obstacles = [],
+        deco = [];
+      function setupMenus() {
+        const container = document.getElementById("levelContainer");
+        levelData.forEach((ld, i) => {
+          const div = document.createElement("div");
+          div.className = `level-item ${ld.config.type}`;
+          div.innerHTML = `<span class="level-num">${
+            i + 1
+          }</span><span class="level-diff">${ld.config.type}</span>`;
+          div.onclick = () => startGame(i);
+          container.appendChild(div);
+        });
+        const colorGrid = document.getElementById("colorGrid");
+        colors.forEach((c) => {
+          const dot = document.createElement("div");
+          dot.className = "color-dot";
+          dot.style.background = c;
+          dot.onclick = () => {
+            playerColor = c;
+            document.documentElement.style.setProperty("--accent", c);
+            updatePreviews();
+          };
+          colorGrid.appendChild(dot);
+        });
+        const skinGrid = document.getElementById("skinGrid");
+        skinKeys.forEach((key) => {
+          const div = document.createElement("div");
+          div.className = "skin-option";
+          div.id = "skin-" + key;
+          div.innerHTML = `<canvas width="40" height="40"></canvas>`;
+          div.onclick = () => {
+            selectedSkin = key;
+            updatePreviews();
+          };
+          skinGrid.appendChild(div);
+        });
+        const waveGrid = document.getElementById("waveGrid");
+        waveKeys.forEach((key) => {
+          const div = document.createElement("div");
+          div.className = "skin-option";
+          div.id = "wave-" + key;
+          div.innerHTML = `<canvas width="40" height="40"></canvas>`;
+          div.onclick = () => {
+            selectedWave = key;
+            updatePreviews();
+          };
+          waveGrid.appendChild(div);
+        });
+        updatePreviews();
+        genDeco();
+      }
+      function updatePreviews() {
+        skinKeys.forEach((key) => {
+          const canv = document.querySelector("#skin-" + key + " canvas");
+          const g = canv.getContext("2d");
+          g.clearRect(0, 0, 40, 40);
+          g.save();
+          g.translate(20, 20);
+          g.fillStyle = playerColor;
+          Icons[key](g, 30);
+          g.restore();
+        });
+        waveKeys.forEach((key) => {
+          const canv = document.querySelector("#wave-" + key + " canvas");
+          const g = canv.getContext("2d");
+          g.clearRect(0, 0, 40, 40);
+          g.save();
+          g.translate(20, 20);
+          g.fillStyle = playerColor;
+          g.strokeStyle = "white";
+          WaveSkins[key](g, 25);
+          g.restore();
+        });
+      }
+      function switchMenu(id) {
+        document
+          .querySelectorAll(".menu-card")
+          .forEach((m) => m.classList.add("hidden"));
+        const target = document.getElementById(id);
+        if (target) {
+          target.classList.remove("hidden");
+          document.getElementById("ui-overlay").classList.remove("hidden");
+        } else {
+          document.getElementById("ui-overlay").classList.add("hidden");
+        }
+        if (id === "homeMenu") {
+          state = "MENU";
+          document.getElementById("gameStats").classList.add("hidden");
+          document.getElementById("pauseBtn").classList.add("hidden");
+        }
+      }
+      function startGame(idx) {
+        currentLvlIdx = idx;
+        const lvl = levelData[idx];
+        state = "PLAYING";
+        distance = 0;
+        gravityDir = 1;
+        obstacles = [];
+        player.mode = "cube";
+        player.vy = 0;
+        player.y = 420;
+        player.rot = 0;
+        player.trail = [];
+        speed = lvl.config.speed;
+        genLevel(lvl, idx);
+        switchMenu("none");
+        document.getElementById("gameStats").classList.remove("hidden");
+        document.getElementById("pauseBtn").classList.remove("hidden");
+        document.getElementById("lvlNameDisplay").innerText = lvl.name;
+      }
+      function genLevel(lvl, lvlIdx) {
+        seed = lvlIdx + 12345;
+        let x = 1000;
+        let activeMode = "cube";
+        let isUpsideDown = false;
+        const c = lvl.config;
+        for (let i = 0; i < c.len; i++) {
+          x += 300 + seededRandom() * 200;
+          if (i === 5 || i === 15 || i === 30 || i === 45) {
+            const modes = ["cube", "wave", "ufo"];
+            activeMode = modes[Math.floor(seededRandom() * modes.length)];
+            if (lvlIdx >= 10 && seededRandom() > 0.5)
+              isUpsideDown = !isUpsideDown;
+            obstacles.push({
+              x,
+              y: 0,
+              w: 60,
+              h: 500,
+              type: "portal",
+              to: activeMode,
+              upsideDown: isUpsideDown,
+            });
+            x += 400;
+            continue;
+          }
+          if (activeMode === "wave" || activeMode === "ufo") {
+            let gateY = 100 + seededRandom() * 200;
+            obstacles.push({ x, y: 0, w: 30, h: gateY, type: "block" });
+            obstacles.push({
+              x,
+              y: gateY + c.gap,
+              w: 30,
+              h: 500,
+              type: "block",
+            });
+          } else {
+            obstacles.push({
+              x: x,
+              y: isUpsideDown ? 50 : 420,
+              w: 30,
+              h: 30,
+              type: "spike",
+              upside: isUpsideDown,
+            });
+          }
+        }
+        obstacles.push({ x: x + 1000, y: 0, w: 50, h: 500, type: "win" });
+      }
+      function genDeco() {
+        deco = [];
+        for (let i = 0; i < 20; i++)
+          deco.push({
+            x: Math.random() * 2000,
+            y: 100 + Math.random() * 300,
+            w: 40 + Math.random() * 100,
+            h: 40 + Math.random() * 400,
+            s: 0.2 + Math.random() * 0.5,
+          });
+      }
+      function update() {
+        if (state !== "PLAYING") return;
+        distance += speed;
+        const floor = gravityDir === 1 ? 420 : 50;
+        if (player.mode === "cube") {
+          player.vy += 0.6 * gravityDir;
+          if (
+            isPressing &&
+            (gravityDir === 1 ? player.y >= 420 : player.y <= 50)
+          )
+            player.vy = -12 * gravityDir;
+          player.y += player.vy;
+          player.rot += 0.15 * gravityDir;
+          if (gravityDir === 1 ? player.y > 420 : player.y < 50) {
+            player.y = floor;
+            player.vy = 0;
+            player.rot = Math.round(player.rot / 1.57) * 1.57;
+          }
+        } else if (player.mode === "ufo") {
+          player.vy += 0.5 * gravityDir;
+          if (isPressing && !wasPressing) player.vy = -8 * gravityDir;
+          player.y += player.vy;
+          if (player.y > 420 || player.y < 50) die();
+        } else if (player.mode === "wave") {
+          player.vy = isPressing ? -speed * gravityDir : speed * gravityDir;
+          player.y += player.vy;
+          if (player.y > 420 || player.y < 50) die();
+          player.trail.push({ x: player.x + 15, y: player.y + 15 });
+          if (player.trail.length > 25) player.trail.shift();
+        }
+        obstacles.forEach((o, i) => {
+          o.x -= speed;
+          if (
+            player.x < o.x + o.w &&
+            player.x + player.w > o.x &&
+            player.y < o.y + o.h &&
+            player.y + player.h > o.y
+          ) {
+            if (o.type === "portal") {
+              player.mode = o.to;
+              gravityDir = o.upsideDown ? -1 : 1;
+              obstacles.splice(i, 1);
+            } else if (o.type === "win") {
+              state = "MENU";
+              switchMenu("homeMenu");
+            } else die();
+          }
+        });
+        wasPressing = isPressing;
+        document.getElementById("progressLabel").innerText =
+          Math.floor(
+            (distance / (levelData[currentLvlIdx].config.len * 500)) * 100
+          ) + "%";
+      }
+      function draw() {
+        let grd = ctx.createLinearGradient(0, 0, 0, 500);
+        grd.addColorStop(0, "#222");
+        grd.addColorStop(1, "#111");
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, 900, 500);
+        deco.forEach((d) => {
+          d.x -= speed * 0.3 * d.s;
+          if (d.x < -200) d.x = 1000;
+          ctx.fillStyle = "rgba(255,255,255,0.02)";
+          ctx.fillRect(d.x, d.y, d.w, d.h);
+        });
+        ctx.strokeStyle = playerColor;
+        ctx.strokeRect(-5, 450, 910, 50);
+        ctx.strokeRect(-5, 0, 910, 50);
+        obstacles.forEach((o) => {
+          if (o.type === "spike") {
+            ctx.fillStyle = "#f33";
+            ctx.beginPath();
+            if (!o.upside) {
+              ctx.moveTo(o.x, 450);
+              ctx.lineTo(o.x + 15, 420);
+              ctx.lineTo(o.x + 30, 450);
+            } else {
+              ctx.moveTo(o.x, 50);
+              ctx.lineTo(o.x + 15, 80);
+              ctx.lineTo(o.x + 30, 50);
+            }
+            ctx.fill();
+          } else if (o.type === "block") {
+            ctx.fillStyle = "#1a1a1a";
+            ctx.fillRect(o.x, o.y, o.w, o.h);
+            ctx.strokeStyle = playerColor;
+            ctx.strokeRect(o.x, o.y, o.w, o.h);
+          } else if (o.type === "portal") {
+            ctx.fillStyle = o.upsideDown ? "#ff0" : "#f80";
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(o.x, 0, o.w, 500);
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = ctx.fillStyle;
+            ctx.strokeRect(o.x, 0, o.w, 500);
+          }
+        });
+        if (player.mode === "wave") {
+          ctx.beginPath();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = playerColor;
+          player.trail.forEach((t, i) => {
+            t.x -= speed;
+            i === 0 ? ctx.moveTo(t.x, t.y) : ctx.lineTo(t.x, t.y);
+          });
+          ctx.stroke();
+        }
+        ctx.save();
+        ctx.translate(player.x + 15, player.y + 15);
+        if (gravityDir === -1) ctx.scale(1, -1);
+        ctx.fillStyle = playerColor;
+        if (player.mode === "cube") {
+          ctx.rotate(player.rot * gravityDir);
+          Icons[selectedSkin](ctx, 30);
+        } else if (player.mode === "ufo") {
+          ctx.fillStyle = "#444";
+          ctx.beginPath();
+          ctx.ellipse(0, 5, 25, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,0.3)";
+          ctx.beginPath();
+          ctx.arc(0, 0, 15, Math.PI, 0);
+          ctx.fill();
+          ctx.stroke();
+          ctx.save();
+          ctx.scale(0.4, 0.4);
+          ctx.translate(0, -10);
+          ctx.fillStyle = playerColor;
+          Icons[selectedSkin](ctx, 30);
+          ctx.restore();
+        } else if (player.mode === "wave") {
+          WaveSkins[selectedWave](ctx, 25);
+        }
+        ctx.restore();
+      }
+      function die() {
+        state = "DEAD";
+        switchMenu("deathScreen");
+      }
+      function resetGame() {
+        attempts++;
+        document.getElementById("attemptLabel").innerText = "ATT: " + attempts;
+        startGame(currentLvlIdx);
+      }
+      function togglePause() {
+        state = state === "PAUSED" ? "PLAYING" : "PAUSED";
+        switchMenu(state === "PAUSED" ? "homeMenu" : "none");
+      }
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "Space") isPressing = true;
+      });
+      window.addEventListener("keyup", (e) => {
+        if (e.code === "Space") isPressing = false;
+      });
+      canvas.addEventListener("mousedown", () => (isPressing = true));
+      window.addEventListener("mouseup", () => (isPressing = false));
+      setupMenus();
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+      loop();
+    </script>
+  </body>
+</html>
